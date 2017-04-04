@@ -1,0 +1,7 @@
+contig	haplotype_block	hap_X	hap_Y	odds_ratio	My_hap	Sp_hap
+2	726	C-G-C-A-T-G-A-C-T-G-C-G-A-G-G-G-A-A-C-T-G-G-T-G	T-C-T-T-G-A-T-G-A-A-A-A-G-C-A-A-C-G-A-C-A-T-A-A	0.012	T-C-T-T-G-A-T-G-A-A-A-A-G-C-A-A-C-G-A-C-A-T-A-A	C-G-C-A-T-G-A-C-T-G-C-G-A-G-G-G-A-A-C-T-G-G-T-G
+2	1094	G-C	A-T	0.02	A-T	G-C
+2	1335	C-T-T-C-T-G	A-C-A-A-C-A	0.001	A-C-A-A-C-A	C-T-T-C-T-G
+2	3353	T-T	A-C	314.5	T-T	A-C
+2	254	T-T-G-C-G-G	A-G-A-T-A-A	719.8	T-T-G-C-G-G	A-G-A-T-A-A
+2	255	G-C-T-A-T-C-T-T-G-G-C-T-C-G-G-A-A-G-A-G-G-G-G-C-G-G-A-A-T-G-A-C-A-C-A	T-T-C-T-C-A-C-C-T-A-T-C-G-T-A-C-C-A-G-T-A-A-A-T-T-A-G-T-G-A-C-A-G-A-G	15284.5	G-C-T-A-T-C-T-T-G-G-C-T-C-G-G-A-A-G-A-G-G-G-G-C-G-G-A-A-T-G-A-C-A-C-A	T-T-C-T-C-A-C-C-T-A-T-C-G-T-A-C-C-A-G-T-A-A-A-T-T-A-G-T-G-A-C-A-G-A-G
