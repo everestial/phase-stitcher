@@ -6,6 +6,7 @@ This program exclusively uses the partial phase states generated using the tool 
 and is designed to work exclusively for F1 hybrid for now.
 
 # Note: This is written in python3 and requires the following modules
+
 pandas
 io
 pyvcf
