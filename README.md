@@ -24,8 +24,13 @@ This tools address the above limitations and provides a method to create a less 
     - running a 0 order markov model which directly utilizes the given frequency of allele in each population
     - or by running a 1st order markov model if there are partially (readback phased) population resequence data
     
+
+# Note:
+- Basically this tool takes the paritally phased haplotypes
+    - segregates them to maternal vs. paternal population haplotypes (using markov model)
+    - stitches the haplotypes to create a genome wide haplotype
     
-This program is exclusively designed to phase haplotypes in F1 hybrid for now, but can be equally extended to phase F2 hybrids (awaiting updates).
+This program is exclusively designed to phase haplotypes in F1 hybrid for now, but can be equally extended to phase F2 hybrids (work on progress).
 
 # Prerequisites:
 Python packages and modules
@@ -37,6 +42,7 @@ Python packages and modules
 - collections
 - functools
 
+## Running phase-Stitcher
 
 # Usage (**using the given test data in the example folder**): 
 
