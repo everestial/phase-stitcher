@@ -29,16 +29,16 @@ This program is exclusively designed to phase haplotypes in F1 hybrid for now, b
 
 # Prerequisites:
 Python packages and modules
-- Python3
-- pandas
+- Python3 (https://www.python.org/)
+- pandas (http://pandas.pydata.org/)
 - io
-- pyvcf
+- pyvcf (https://github.com/jamescasbon/PyVCF)
 - itertools
 - collections
 - functools
 
 
-#Usage: 
+# Usage (**using the given test data in the example folder**): 
 
     python Stitcher_using_1stOrderMarkov_InteractiveMode.py --vcf1 MY_subSample.vcf --vcf2 SP_subSample.vcf --pop1 My --pop2 Sp --output test --het_vcf F1_subSample.vcf --f1_sample 2ms04h
 
