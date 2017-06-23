@@ -1,3 +1,5 @@
+# Updates, tutorials and documentation changes expected soon.
+
 # pHASE-Stitcher
 ## Introduction
 **a python program to stitch the ReadBack phased genotypes to create the extended haplotypes in F1 hybrid individuals.**
