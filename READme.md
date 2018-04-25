@@ -1,8 +1,7 @@
 # phASE-Stitcher
 
-**Stitcher** for the readbackphased haplotype blocks in F1 hybrids.\
 ***A python program to segregate and stitch the ReadBackPhased genotypes in F1 hybrids using first order markov chain and transition probabilities.\
-This tool can be used as a companion tool with [`phase-Extender`](https://github.com/everestial/phase-Extender) or as a standalone tool.***
+This tool can be used as a companion tool along with [`phase-Extender`](https://github.com/everestial/phase-Extender) or as a standalone tool.***
 
 Developed by [Bishwa K. Giri](mailto:kirannbishwa01@gmail.com) in the [Remington Lab](https://biology.uncg.edu/people/david-remington/) at the University of North Carolina at Greensboro, Biology department.
 
@@ -24,65 +23,85 @@ Support @ https://groups.google.com/d/forum/phase-extender
 # BACKGROUND
 Haplotype phasing is a second "go to" problem in bioinformatics after read alignment. The importance of haplotype phasing applies directly to the analyses of ASE (allele specific expression), preparation of extended haplotype for EHH (extended haplotype homozygosity) test, and preparation of dipolid genome which will soon be a new standard in bioinformatics in coming years, etc. The necessity for haplotype phasing (and eventually diploid genome) increases with the increase in heterozygosity in the genome, because higher hetetogeneity leads to larger alignment bias and complicates the reliability of the variants that are called using that alignment data (SAM, BAM files).
 
-Haplotype phasing has mostly concerntrated around fixing the phase state in less heterogenous individuals and/or in inbred lines. Existing methods in haplotype phasing have not addressed issues with genome that are highly heterogenous or are hybrids. The only possible method to phase F1 hybrids is by taking `mom, dad, child` trio, which is not optimal when parental information are missing, or in wild populations of hybrids.
+ASE (allele specific expression) analyses using haploid reference genomes in hybrid individuals or population are more susceptible to biased ASE observation considering following factors:
+  - alignment to reference genome will likely trigger higher mapping of the reads from the population closer to the reference genome.
+  - using allele masking to address alignment bias is again more likely to attract paralogous alignment creating futher biases.
+  
+Optimal approach to ASE therefore involves preparation of phased genome of the hybrids, then preparation of diploid genome and then competitive alignment of the reads using more conserved strategy. 
 
-**`phase-Stitcher`** is designed to overcome this limitations in haplotype phasing by utilizing
+Haplotype phasing has mostly concerntrated around fixing the phase state in humans who have highly homogenous genome and/or in inbred lines of mice and largely studied model systems, which have lots of haplotype reference panels available.  Existing methods in haplotype phasing therefore have not addressed issues with genome that are highly heterogenous or are hybrids. ASE (allele specific expression) which aims to identify cis regulatory factors and mechanism underlying gene expression differeces at the same loci are heading toward more genomic and rnaseq approaches. The full resolution of ASE therefore relies on the quality of the phased dipoid genome, which requires genome wide phasing. The only possible method to phase F1 hybrids is by taking `mom, dad, child` trio, which is not optimal when parental information are missing, or in the natural hybrids where parental identification is not possible. Also, existing trio methods are genotype based which take allele at single position at once. 
+
+**`phase-Stitcher`** is designed to overcome this limitations in haplotype phasing by utilizing RBphased haplotype blocks. The advantages of using `phase-Stiticher` is explained below:
   - With increase in the size of sequence reads we are able to generate larger RBphased fragments. These fragments are again considerably larger when a heterogenous population is sequenced. F1 hyrbids of these heterogenous population have even larger RBphased fragments. Thus, haplotype phasing using RBphase data is most optimal approach to solving haplotype phasing.
-  - This tool doesn't require exact `maternal, parental` data to solve phase state in F1. Rather phasing can be casually approached by supplying genotype data from `maternal vs. parental` background. 
-  - this tools is also able to segregate haplotype into maternal vs. paternal background, thus solving haplotype phase state genome wide. 
-  - 
+  - This tool doesn't require exact `maternal, parental` genotype data to solve phase state in F1. Rather phasing can be casually approached by supplying genotype data from `maternal vs. parental` background. 
+  - This tools is also able to segregate haplotype into maternal vs. paternal background, thus solving haplotype phase state genome wide for each parents. 
+
+
+## ![#f03c15](https://placehold.it/15/f03c15/000000?text=+)Data Requirements
+
+**phASE-Stitcher** can be used with the multi-sample vcf files produced by GATK pipeline or other tools that generate readbackphased haplotype blocks in the output VCF. A haplotype file is created using the RBphased VCF and then piped into **phase-Stitcher**. See, this example for data structure of input haplotype file [sample input haplotype file01]() - a tab separated text file with `PI` and `PG_al` value for each samples.
+
+
+
+## Algorithm
+For the **mcve** regarding the algorithm see this issue on [**stackoverflow**]() and/or [**my blog**](). 
+
+<br>
+<br>
+
+# Tutorial
+
+## Setup
+**phase-Extender** is written in python3 interpreter. So, it can be directly run using the **".py"** file, given all the required modules (dependencies) are installed.
+
+**Runs on `Python 3.x` and has the following dependencies:**
+
+  - [argparse](https://docs.python.org/3/library/argparse.html)
+  - [collections](https://docs.python.org/3/library/collections.html?highlight=collections#module-collections)
+  - [itertools](https://docs.python.org/3/library/itertools.html?highlight=itertools)
+  - [io](https://docs.python.org/3/library/io.html?highlight=io#module-io)
+  - math
+  - [multiprocessing](https://docs.python.org/3/library/multiprocessing.html?highlight=multiprocessing#)
+  - [pandas](http://pandas.pydata.org/)
+  - re
+  - [resource](https://docs.python.org/3/library/resource.html?highlight=resource#module-resource)
+  - [time](https://docs.python.org/3/library/time.html?highlight=time#module-time)
+  - shutil
   
+<br>
   
-# to be Contd ..... 
+## Installation
+```
+pip3 install -r requirements.txt
+
+#Or, if sudo previlages required, use:
+sudo pip3 install -r requirements.txt
+```
+
+**If there is issues with installation while using `requirements.txt` install each dependencies individually.**\
+e.g: `sudo python3 -m pip install pandas`  
+  
+<br>
+
+## Usage
+  Requires a readbackphased `haplotype file` as input and returns segregated and stitched haplotype file and other results files containing statistics on the initial vs. extended haplotype. 
 
 
-
-
-
-This program is designed to extend the haplotypes using the phased genotypes (allele) states of paritally phased F1 hybrids. It exclusively uses the `Phased Genotype i.e PG` and `Phase Block Index i.e PI` generated by the program `pHASER` https://github.com/secastel/phaser , https://github.com/secastel/phaser/tree/master/phaser
-
-Assumption: This program underlies the following assumptions
-- ASE analyses in hybrid individuals/population are more susceptible to biased ASE observation considering following factors:
-    - alignment to reference genome will likely trigger higher mapping of the reads from the population closer to the reference genome.
-    - allele masking to solve the above problems is again more likely to attract paralogous alignment creating futher biases.
-    - Cautionary approaches to ASE anlayses in hybrids involve preparation of diploid genome and then alignment using competitive and conserved strategy
-    - Competitive and conserved alignment requires preparation of diploid genome.
-    - Preparation of the diploid genome using allele frequency alone is susceptible to switch-errors.
+Check this detailed [step by step tutorial](https://github.com/everestial/pHASE-Stitcher/wiki) for preparation of `input files` and know-how about running `phase-Stitcher`.
     
- 
-This tools address the above limitations and provides a method to create a less biased whole genome haplotype by taking in following consideration:
+<br>
 
-- F1 hybrids contains higher number of heterozygous sites there by providing a pool of genetic variaion which can be used with NGS data to create paritially phased (readback phased) haplotypes.
-- Maternal and paternal populations are diverged enough that allele frequency in maternal vs. paternal population can be used to indentify which haplotype in F1 came from which population.
-- The identified haplotypes can then be stitched to create a genomewide haplotypes for the given F1 hybrid.
-- phasing in F1 hybrids need not consider the effects from the recombination since recombination happened in the paternal and maternal population.
-- phase state in the F1 can be directly identified by taking into the consideration 
-    - allele frequecy of the phased allele in the maternal vs. paternal population
-    - running a 0 order markov model which directly utilizes the given frequency of allele in each population
-    - or by running a 1st order markov model if there are partially (readback phased) population resequence data
-    
+## Input data
 
-## Note:
-- Basically this tool takes the paritally phased haplotypes
-    - segregates them to maternal vs. paternal population haplotypes (using markov model)
-    - stitches the haplotypes to create a genome wide haplotype
-    
-This program is exclusively designed to phase haplotypes in F1 hybrid for now and should work equally with data generated from genome reseq, RNAseq, WES or RAD given the individual is a hybrid derived from divergent strains and/or populations, but may be used to equally extended to phase F2 hybrids (work on progress).
+***haplotype file (required):*** Input haplotype file. Should contain `PI` and `PG_al` values for each sample.\
+To convert the vcf file to haplotype file (from VCF to proper text format) use **Step 01 (a)** in the tutorial. \
+The sample name should not contain "`_`" character.
 
-# Prerequisites:
-Python packages and modules
-- Python3 (https://www.python.org/)
-- pandas (http://pandas.pydata.org/)
-- io
-- pyvcf (https://github.com/jamescasbon/PyVCF)
-- itertools
-- collections
-- functools
 
-# Running phase-Stitcher
+## Output data
+contd.... 
 
-## Usage (**using the given test data in the example folder**): 
 
-    python Stitcher_using_1stOrderMarkov_InteractiveMode.py --vcf1 MY_subSample.vcf --vcf2 SP_subSample.vcf --pop1 My --pop2 Sp --output test --het_vcf F1_subSample.vcf --f1_sample 2ms04h
+
 
 
