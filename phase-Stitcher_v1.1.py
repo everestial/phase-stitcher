@@ -9,6 +9,7 @@ print("Checking and importing required modules... ")
 
 import argparse
 from collections import OrderedDict
+from decimal import Decimal
 #import dask.dataframe as dd
 import os, time
 from io import StringIO
@@ -20,6 +21,10 @@ import pandas as pd
 import resource
 import re
 import shutil
+
+
+import sys
+
 
 
 ## **Note: Code for complete dask installation on python3
@@ -279,19 +284,19 @@ def main():
         # multiprocessing of data (by lazy "imap" process)
 
         # folder for storing the splitted dataframes
-        if os.path.exists('chunked_Data'):
-            shutil.rmtree('chunked_Data', ignore_errors=False, onerror=None)
-        os.makedirs('chunked_Data/', exist_ok=True)
+        if os.path.exists('chunked_Data_' + soif1):
+            shutil.rmtree('chunked_Data_' + soif1, ignore_errors=False, onerror=None)
+        os.makedirs('chunked_Data_' + soif1, exist_ok=True)
 
 
         # split the data by grouping and write it to the disk.
         for chr_, data_by_chr in my_df_by_contig:
             if chr_list == '':
-                pd.DataFrame.to_csv(data_by_chr, 'chunked_Data/mydata_' + str(chr_),
+                pd.DataFrame.to_csv(data_by_chr, 'chunked_Data_' + soif1 + '/mydata_' + str(chr_),
                                     sep='\t', index=False, header=True)
             elif chr_list != '':
                 if str(chr_) in chr_list:
-                    pd.DataFrame.to_csv(data_by_chr, 'chunked_Data/mydata_' + str(chr_),
+                    pd.DataFrame.to_csv(data_by_chr, 'chunked_Data_' + soif1 + '/mydata_' + str(chr_),
                                         sep='\t', index=False, header=True)
 
 
@@ -306,7 +311,7 @@ def main():
     '''Step 06: Clean the directory that is storing splitted dataframe. '''
 
     # remove the chunked data folder
-    shutil.rmtree('chunked_Data', ignore_errors=False, onerror=None)
+    shutil.rmtree('chunked_Data_' + soif1, ignore_errors=False, onerror=None)
 
     print('The End :)')
 
@@ -321,7 +326,7 @@ def multiproc(pool):
 
 
     ''' Step 02 - B: Start, multiprocessing/threading - process each contig separately. '''
-    path = 'chunked_Data/'  # opens the a temp folder
+    path = 'chunked_Data_' + soif1 + '/'  # opens the a temp folder
     file_path = sorted([path + item for item in os.listdir(path)], key=numericalSort)
 
 
@@ -346,15 +351,18 @@ def multiproc(pool):
     # but, will that lead to a problem when multiple data/process are being written or are in imap queue??
     # ** rethink in the future if this is a problem with large data, and while writing to the disk.
 
+
     results = list(results)
 
-    result_long = [result[0] for result in list(results)]
-    result_wide = [result[1] for result in list(results)]
+    result_long = [result[0] for result in results]
+    result_wide = [result[1] for result in results]
 
 
-    ## merge all the data now
-    result_merged_long = pd.concat(result_long)
-    result_merged_wide = pd.concat(result_wide)
+
+
+    ## merge all the data both length and widthwise
+    result_merged_length = pd.concat(result_long)
+    result_merged_width = pd.concat(result_wide)
 
 
     ''' Step : merge the returned result (extended haplotype block by each contigs)
@@ -363,10 +371,10 @@ def multiproc(pool):
     # write this updated dataframe to file.
     # ** for future: or write is directly after "imap'ing". The main problem is that they complete at different times
     # and complete result is not obtained. ** problem not known.
-    pd.DataFrame.to_csv(result_merged_long, outputdir + '/' + soif1 + '_haplotype_long.txt',
+    pd.DataFrame.to_csv(result_merged_length, outputdir + '/' + soif1 + '_haplotype_long.txt',
                         header=True, index=False, sep='\t')
 
-    pd.DataFrame.to_csv(result_merged_wide, outputdir + '/' + soif1 + '_haplotype_wide.txt',
+    pd.DataFrame.to_csv(result_merged_width, outputdir + '/' + soif1 + '_haplotype_wide.txt',
                         header=True, index=False, sep='\t')
 
 
@@ -377,7 +385,6 @@ def multiproc(pool):
     print()
 
     print("Completed writing the dataframes .....")
-
 
 
 
@@ -406,9 +413,12 @@ def process_by_contig(file_path):
     my_df_grouped = contigs_group.groupby(soif1 + '_PI', sort=False)
 
 
+
     # empty list to store the pandas dataframe
     haplotype_result_long = []
     haplotype_result_wide = []
+
+
 
 
     '''Step 03 - B: process the data within each unique "PI" separately '''
@@ -476,8 +486,8 @@ def process_by_contig(file_path):
             '''Step 04 - C: Segregate the haplotypes: Pass the likelihood estimates to another function
                             to compute log2Odds and segregate the haplotypes into mom vs. dad background. '''
             updated_df_long, updated_df_wide = compute_lods(likelihood_hap_left_dad, likelihood_hap_right_dad,
-                         likelihood_hap_left_mom, likelihood_hap_right_mom,
-                         haplotype_left, haplotype_right, data_by_pi)
+                         likelihood_hap_left_mom, likelihood_hap_right_mom, haplotype_left, haplotype_right,
+                                                            data_by_pi)
 
 
             ### Store the pandas dataframe as list
@@ -485,18 +495,30 @@ def process_by_contig(file_path):
             haplotype_result_wide.append(updated_df_wide)
 
 
+    if len(haplotype_result_long) == 0 or len(haplotype_result_wide) == 0:
+        result_merged_long = pd.DataFrame()
+        result_merged_wide = pd.DataFrame()
+
 
     '''Returns to Step 06: '''
     ## merge the list of pandas dataframe into one dataframe
         # and then return it to the imap pool
         # ** - we can directly write the data to file using pd.csv (append) method
-    result_merged_long = pd.concat(haplotype_result_long, axis=0)
-    result_merged_wide = pd.concat(haplotype_result_wide, axis=0)
+    try:
+        result_merged_long = pd.concat(haplotype_result_long, axis=0)
+        result_merged_wide = pd.concat(haplotype_result_wide, axis=0)
+
+    except ValueError:  # Sometimes empty list is returned so, raising this exception
+        print('value error')
+        result_merged_long = pd.DataFrame()
+        result_merged_wide = pd.DataFrame()
+
 
 
     print(' - Phase-extension completed for contig "%s" in %.6f seconds' % (chr_, time.time() - time_chr))
     print(' - Worker maximum memory usage: %.2f (mb)' % (current_mem_usage()))
     print()
+
 
     return (result_merged_long, result_merged_wide)
 
@@ -528,7 +550,7 @@ def compute_transition(my_df_dict, haplotype_left, haplotype_right, parent, orie
     #print('orientation: ', orientation)
     ## pick parental type for likelihood estimation
     if parent == 'dad':
-        parent = soidad
+        parent  = soidad
 
     elif parent == 'mom':
         parent = soimom
@@ -571,8 +593,13 @@ def compute_transition(my_df_dict, haplotype_left, haplotype_right, parent, orie
         n2 = v2[0]
 
 
+
         '''Skip the markov chain if indels is present in either "n1" or "n2" level. '''
         if len(v1[1]) > 3 or len(v2[1]) > 3:
+            continue
+
+        '''Skip the markov chain if symbolic allele (e.g "*") is present in either "n1" or "n2" level. '''
+        if "*" in v1[1] or "*" in v2[1]:
             continue
 
 
@@ -722,16 +749,29 @@ def compute_lods(likelihood_hap_left_dad, likelihood_hap_right_dad,
 
     kite = 'hello'  # just a mock variable to highlight the doc string below
 
+    #print()
+    #print('debug marker')
+    #print(likelihood_hap_left_mom, likelihood_hap_left_dad)
+    #print(likelihood_hap_right_mom, likelihood_hap_right_dad)
+
 
     '''Segregate the haplotype and write it to a file. '''
 
-    logOdds_hapL_vs_hapR_is_mat_vs_pat = log_Odds_Ratio = math.log2(
+    #logOdds_hapL_vs_hapR_is_mat_vs_pat = log_Odds_Ratio = math.log2(
+     #   (likelihood_hap_left_mom / likelihood_hap_left_dad) /
+      #  (likelihood_hap_right_mom / likelihood_hap_right_dad))
+
+    lh_hapL_vs_hapR_is_mat_vs_pat = Decimal(
         (likelihood_hap_left_mom / likelihood_hap_left_dad) /
         (likelihood_hap_right_mom / likelihood_hap_right_dad))
 
-    log_Odds_Ratio = round(log_Odds_Ratio, 3)
+    log_Odds_Ratio = Decimal(lh_hapL_vs_hapR_is_mat_vs_pat).ln() / (Decimal('2').ln())
 
-    del logOdds_hapL_vs_hapR_is_mat_vs_pat
+    log_Odds_Ratio = round(float(log_Odds_Ratio), 3)
+    #print()
+    #print(log_Odds_Ratio)
+
+    del lh_hapL_vs_hapR_is_mat_vs_pat
 
 
     if log_Odds_Ratio >= float(lods_cut_off):
@@ -774,6 +814,10 @@ def compute_lods(likelihood_hap_left_dad, likelihood_hap_right_dad,
 
 
     ## ** For future: update the haplotype statistics (at this position) if desired.
+    ## The stats can have following headers
+    # contig	ms02g_PI	phased_PI	total_haplotypes	phased_haplotypes	\
+    # total_Vars	phased_Vars	Ref_in_Mat	Ref_in_Pat
+
 
 
 
@@ -798,6 +842,7 @@ def numericalSort(value):
 ''' function to return the transitions probabilities from transition counts'''
 def compute_probs(pX_Y, pX, modeis):
     # returns emission or transition probs from "X" to "Y"
+    #** variable "modeis" not used now. Use it in future.
 
     return round(pX_Y / pX, 7)
 
