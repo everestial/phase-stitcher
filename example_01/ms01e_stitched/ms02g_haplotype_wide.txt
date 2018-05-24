@@ -1,2 +1,0 @@
-contig	pos_range	ms02g_PI	hap_left	hap_right	lods	My_hap	Sp_hap
-2	14689421-14689691	9	C-C-C-T-T-C-A-G-C-C	T-A-T-C-C-C-A-A-T-T	-6.89	T-A-T-C-C-C-A-A-T-T	C-C-C-T-T-C-A-G-C-C
