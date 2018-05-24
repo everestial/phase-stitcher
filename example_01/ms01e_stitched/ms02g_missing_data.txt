@@ -1,1 +1,0 @@
-contig	pos	ref	all-alleles	.	MA605_PI	MA605_PG_al	MA611_PI	MA611_PG_al	MA622_PI	MA622_PG_al	MA625_PI	MA625_PG_al	Sp154_PI	Sp154_PG_al	Sp164_PI	Sp164_PG_al	Sp21_PI	Sp21_PG_al	ms01e_PI	ms01e_PG_al	ms02g_PI	ms02g_PG_al
