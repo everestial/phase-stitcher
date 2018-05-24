@@ -1,0 +1,2 @@
+CHROM	POS_Range	ms02g:PI	hap_left	hap_right	log2odds	pat_hap	mat_hap
+2	14689421-14689691	9	C-C-C-T-T-C-A-G-C-C	T-A-T-C-C-C-A-A-T-T	6.017	C-C-C-T-T-C-A-G-C-C	T-A-T-C-C-C-A-A-T-T

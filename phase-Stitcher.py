@@ -10,26 +10,16 @@ print("Checking and importing required modules... ")
 import argparse
 from collections import OrderedDict
 from decimal import Decimal
-#import dask.dataframe as dd
 import os, time
 from io import StringIO
 import itertools
 from itertools import product
-import math
 from multiprocessing import Pool
 import pandas as pd
 import resource
 import re
 import shutil
-
-
 import sys
-
-
-
-## **Note: Code for complete dask installation on python3
-# sudo python3 -m pip install dask[complete]
-
 
 
 '''Overall structure of the program workflow:
@@ -73,14 +63,6 @@ def main():
                              "phased genotype represented by 'PG_al' for all the samples. ",
                         required=True)
 
-    parser.add_argument("--mat",
-                        help="Maternal sample or sample names (comma separated) that "
-                             "belong to maternal background. Sample group can also be "
-                             "assigned using unique prefix/es. "
-                             "Options: 'maternal sample name', 'comma separated samples', 'pre:...'. "
-                             "Unique prefix (or comma separated prefixes) should begin with 'pre:'. ",
-                        required=True)
-
     parser.add_argument("--pat",
                         help="Paternal sample or comma separated sample names that "
                              "belong to Paternal background. "
@@ -89,31 +71,33 @@ def main():
                              "Unique prefix (or comma separated prefixes) should begin with 'pre:'. ",
                         required=True)
 
-    parser.add_argument("--f1_Sample",
+    parser.add_argument("--mat",
+                        help="Maternal sample or sample names (comma separated) that "
+                             "belong to maternal background. Sample group can also be "
+                             "assigned using unique prefix/es. "
+                             "Options: 'maternal sample name', 'comma separated samples', 'pre:...'. "
+                             "Unique prefix (or comma separated prefixes) should begin with 'pre:'. ",
+                        required=True)
+
+    parser.add_argument("--f1Sample",
                         help="Name of the F1-hybrid sample. Please type the name of only one F1 sample.",
                         required=True)
 
-    parser.add_argument("--MatPat_ID",
-                        help="Prefix of the 'maternal' and 'paternal' genotype in the output file. "
+    parser.add_argument("--outPatMatID",
+                        help="Prefix of the 'Paternal (dad)' and 'Maternal (mom)'genotype in the output file. "
                              "This should be a maximum of three letter prefix separated by comma. "
-                             "Default: 'mat,pat'.",
-                        default='mat,pat', required=False)
-
+                             "Default: 'pat,mat'.",
+                        default='pat,mat', required=False)
 
     parser.add_argument("--output", default='', type=str,
                         help="Name of the output directory. "
-                             "Default: f1 Sample + '_stitched' ", required=False)
+                             "Default: f1SampleName + '_stitched' ", required=False)
 
     parser.add_argument("--lods",
                         help="log(2) odds cutoff threshold required "
                              "to assign maternal Vs. paternal haplotype segregation and stitching. ",
                         default=5)
     # note: log_odds_ratio 5 is 2^5 = 32 times likely
-
-
-    parser.add_argument("--chr", required = False, default="",
-                        help="Restrict haplotype stitching to a specific chromosome.")
-
 
     parser.add_argument("--culLH",
                         help="Cumulative likelhood estimates -> "
@@ -122,9 +106,18 @@ def main():
                              "Options: 'maxPd' or 'maxSum'. ",
                         default='maxPd', required=False)
 
+    parser.add_argument("--chr", required = False, default="",
+                        help="Restrict haplotype stitching to a specific chromosome.")
+
+    parser.add_argument("--hapStats",
+                        help="Computes the descriptive statistics of final haplotype. "
+                             "Default: 'no'."
+                             "Option: 'yes', 'no' .",
+                        default='no', required=False)
 
 
-    ''' create a global argument variable and declare values of the global variables.
+
+    ''' create a global argument variables and declare values of the global variables.
             The values for the global variable are assigned using arguments (args.()) passed by user.'''
     # this is necessary if arguments are declared at several functions using "args.variable" parameter.
     global args;
@@ -136,19 +129,20 @@ def main():
     print("#Step 01:  Checking the required files......\n");
 
     #Step 01-B checks if the required files (vcfs) are provided or not
-    check_files = [args.mat, args.pat, args.f1_Sample];
+    check_files = [args.mat, args.pat, args.f1Sample, args.input];
     for xfile in check_files:
         if xfile == "":
             print('fatal error !!! ')
             print("Please assign the required parameter : '%s' ." % (xfile));
                 # reports error message if the checked files isn't found
+            sys.exit()
 
 
 
     ################## begins at ............
     global output
     global outputdir
-    global use_bed
+    global use_bed  # ** prolly deprecate
     global soif1
     global soimom
     global mom_id
@@ -158,7 +152,7 @@ def main():
     global num_of_hets
     global lods_cut_off
     global maxed_as
-    #global writelod  - probably active in the future ??
+    global hapstats
     global time01  # set a start time (used to time computational run for each chromosome vs. all processes)
 
 
@@ -172,13 +166,14 @@ def main():
     print('  - using haplotype file "%s" ' % (input_file))
 
     time01 = time.time()
-    soif1 = args.f1_Sample
+    soif1 = args.f1Sample
     print('  - F1-hybrid of interest: "%s" ' % (soif1))
 
 
     # only read the header of the input haplotype file and ...
     # .. find the required samples (for maternal and paternal background)
     header_ = open(input_file, 'r').readline()
+    print(header_)
 
     soimom = args.mat
     soimom = find_samples(soimom, header_)
@@ -190,14 +185,14 @@ def main():
 
     # prefix for mat,pat haplotype id
     # ** by default treats the samples in "--mat" as maternal and "--pat" as paternal
-    mat_pat_id = args.MatPat_ID
-    if mat_pat_id == 'mat,pat':
-        mom_id = 'mat_hap'
+    pat_mat_id = args.outPatMatID
+    if pat_mat_id == 'pat,mat':
         dad_id = 'pat_hap'
-
+        mom_id = 'mat_hap'
     else:
-        mom_id = mat_pat_id.split(',')[0] + '_hap'
-        dad_id = mat_pat_id.split(',')[1] + '_hap'
+        dad_id = pat_mat_id.split(',')[0] + '_hap'
+        mom_id = pat_mat_id.split(',')[1] + '_hap'
+
 
 
     # Assign the output directory
@@ -237,6 +232,21 @@ def main():
           'the diploid haplotype block into maternal vs. paternal haplotype ' % (max_is))
 
 
+    # Add argument to compute descriptive statistics of the final
+    # print the hapstats to file and also plot histogram
+    if args.hapStats == 'yes':  # default, hapstats = 'no' ** ??
+        hapstats = 'yes'
+        print('  - statistics of the haplotype before and after extension will '
+              'be prepared for the sample of interest i.e "%s" ' %(soif1))
+    else:
+        hapstats = 'no'
+        print('  - statistics of the haplotype before and after extension will not '
+          'be prepared for the sample of interest i.e "%s". '
+              '    Only extendent haplotype block will be prepared.' % (soif1))
+
+    print('hapstats :', hapstats)
+
+
 
     '''Assign the number of process.
        **note: number of process should be declared after all the global variables are declared,
@@ -268,16 +278,16 @@ def main():
             - rest of the data will be appended downstream in the pipeline. '''
 
         missing_data.write('\t'.join(list(my_df)) + '\n')
-        output_long.write('\t'.join(['contig', 'pos', 'ref', 'all-alleles',
-                                     soif1 + '_PI', soif1 + '_PG_al', 'lods',
-                                     mom_id, dad_id]) + '\n')
-        output_wide.write('\t'.join(['contig', 'pos_range', soif1 + '_PI', 'hap_left',
-                                     'hap_right', 'lods', mom_id, dad_id]) + '\n')
+        output_long.write('\t'.join(['CHROM', 'POS', 'REF', 'all-alleles',
+                                     soif1 + ':PI', soif1 + ':PG_al', 'log2odds',
+                                     dad_id, mom_id]) + '\n')
+        output_wide.write('\t'.join(['CHROM', 'POS_Range', soif1 + ':PI', 'hap_left',
+                                     'hap_right', 'log2odds', dad_id, mom_id]) + '\n')
 
 
         ''' using pandas dataframe to load the data as df and dictionary and group by contig'''
         # ** Note: Possible future optimization using "dask" module
-        my_df_by_contig = my_df.groupby('contig', sort=False)
+        my_df_by_contig = my_df.groupby('CHROM', sort=False)
 
 
         '''Step 01 - B: Starting multiprocessing after splitting the dataframe by chromosome.'''
@@ -311,7 +321,7 @@ def main():
     '''Step 06: Clean the directory that is storing splitted dataframe. '''
 
     # remove the chunked data folder
-    shutil.rmtree('chunked_Data_' + soif1, ignore_errors=False, onerror=None)
+    #shutil.rmtree('chunked_Data_' + soif1, ignore_errors=False, onerror=None)
 
     print('The End :)')
 
@@ -358,8 +368,6 @@ def multiproc(pool):
     result_wide = [result[1] for result in results]
 
 
-
-
     ## merge all the data both length and widthwise
     result_merged_length = pd.concat(result_long)
     result_merged_width = pd.concat(result_wide)
@@ -385,8 +393,72 @@ def multiproc(pool):
     print()
 
     print("Completed writing the dataframes .....")
+    print()
 
 
+    # ''' Prepare the descriptive statistics of the phased (stitched) haplotypes if desired: '''
+    if hapstats == 'yes':
+        with open(outputdir + '/' + soif1 + '_haplotype_stats.txt', 'w+') as out_stats:
+            stats = result_merged_width.groupby(['CHROM'], sort = False)
+            out_stats.write('\t'.join(['CHROM', 'phasedBlock', 'unphasedBlock', 'numVarsInPhasedBlock',
+                            'numVarsInUnPhasedBlock', 'log2oddsInPhasedBlock',
+                            'log2oddsInUnPhasedBlock',	'totalNumOfBlock',	'totalNumOfVars']) + '\n')
+
+            for xath, valth in stats:
+                print('Computing descriptive statistics of the final haplotype for contig "%s". ' %str(xath))
+
+                #distribution of the log2odds values in that CHROM
+                log2odds_dist = valth['log2odds'].tolist()
+
+                # name of all haplotype blocks (i.e PI) in that CHROM
+                hapblocks = valth[soif1 + ':PI'].tolist()
+
+                # among all the haplotype blocks find the the ..
+                # .. indexes of the ones that are phased vs. unphased in final haplotype
+                idx_ofphasedblocks = [ith for ith in range(len(log2odds_dist))
+                                      if abs(log2odds_dist[ith]) >= lods_cut_off]
+                idx_ofunphasedblocks = [ith for ith in range(len(log2odds_dist))
+                                        if abs(log2odds_dist[ith]) < lods_cut_off]
+
+                # based on that index find the phased blocks vs. unphased blocks
+                phasedblocks = [hapblocks[zth] for zth in idx_ofphasedblocks]
+                unphasedblocks = [hapblocks[zth] for zth in idx_ofunphasedblocks]
+
+                # compute number of variants in all vs. phased vs. unphased blocks
+                num_vars_in_allblocks = [len(ith.split('-')) for ith in valth['hap_left'].tolist()]
+                num_vars_phased_blocks = [num_vars_in_allblocks[zth] for zth in idx_ofphasedblocks]
+                num_vars_unphased_blocks = [num_vars_in_allblocks[zth] for zth in idx_ofunphasedblocks]
+
+                # convert values to appropriate structure and string type before writing
+                phasedblocks = ','.join(str(x) for x in phasedblocks)
+                unphasedblocks = ','.join(str(x) for x in unphasedblocks)
+                num_vars_phased_blocks = ','.join([str(x) for x in num_vars_phased_blocks])
+                num_vars_unphased_blocks = ','.join([str(x) for x in num_vars_unphased_blocks])
+
+                # find the log2odds of the phased vs. unphased blocks
+                log2_phased_blocks = [log2odds_dist[zth] for zth in idx_ofphasedblocks]
+                log2_unphased_blocks = [log2odds_dist[zth] for zth in idx_ofunphasedblocks]
+
+                log2_phased_blocks = ','.join([str(x) for x in log2_phased_blocks])
+                log2_unphased_blocks = ','.join([str(x) for x in log2_unphased_blocks])
+
+                # compute total number of blocks and total number of variants
+                count_blocks = str(len(log2odds_dist))
+                count_vars = str(sum(num_vars_in_allblocks))
+
+
+                data_to_write = [str(xath), phasedblocks, unphasedblocks, num_vars_phased_blocks,
+                                 num_vars_unphased_blocks, log2_phased_blocks, log2_unphased_blocks,
+                                 count_blocks, count_vars]
+                data_to_write = ['.' if x == '' else x for x in data_to_write]
+
+                out_stats.write('\t'.join(data_to_write))
+
+                out_stats.write('\n')
+            print()
+
+    elif hapstats == 'no':
+        print('Proceeding without preparing descriptive statistics for final haplotype.')
 
 
 
@@ -410,15 +482,11 @@ def process_by_contig(file_path):
     contigs_group = pd.read_csv(StringIO(good_data_by_contig.read()), sep='\t')
 
     # groupby "PI index" and feed it to transition computation
-    my_df_grouped = contigs_group.groupby(soif1 + '_PI', sort=False)
-
-
+    my_df_grouped = contigs_group.groupby(soif1 + ':PI', sort=False)
 
     # empty list to store the pandas dataframe
     haplotype_result_long = []
     haplotype_result_wide = []
-
-
 
 
     '''Step 03 - B: process the data within each unique "PI" separately '''
@@ -432,8 +500,8 @@ def process_by_contig(file_path):
             my_df_dict = data_by_pi.to_dict(orient='list')
 
             ### Split the RBphase block into the left and right haplotype type
-            haplotype_left = [x.split('|')[0] for x in my_df_dict[soif1 + '_PG_al']]
-            haplotype_right = [x.split('|')[1] for x in my_df_dict[soif1 + '_PG_al']]
+            haplotype_left = [x.split('|')[0] for x in my_df_dict[soif1 + ':PG_al']]
+            haplotype_right = [x.split('|')[1] for x in my_df_dict[soif1 + ':PG_al']]
 
 
             ''' Enter Step 04: '''
@@ -483,7 +551,7 @@ def process_by_contig(file_path):
 
 
 
-            '''Step 04 - C: Segregate the haplotypes: Pass the likelihood estimates to another function
+            '''Step 04 - B: Segregate the haplotypes: Pass the likelihood estimates to another function
                             to compute log2Odds and segregate the haplotypes into mom vs. dad background. '''
             updated_df_long, updated_df_wide = compute_lods(likelihood_hap_left_dad, likelihood_hap_right_dad,
                          likelihood_hap_left_mom, likelihood_hap_right_mom, haplotype_left, haplotype_right,
@@ -498,6 +566,7 @@ def process_by_contig(file_path):
     if len(haplotype_result_long) == 0 or len(haplotype_result_wide) == 0:
         result_merged_long = pd.DataFrame()
         result_merged_wide = pd.DataFrame()
+        result_merged_stats = pd.DataFrame()
 
 
     '''Returns to Step 06: '''
@@ -509,7 +578,7 @@ def process_by_contig(file_path):
         result_merged_wide = pd.concat(haplotype_result_wide, axis=0)
 
     except ValueError:  # Sometimes empty list is returned so, raising this exception
-        print('value error')
+        print('No RBphased haplotypes available in this contig.')
         result_merged_long = pd.DataFrame()
         result_merged_wide = pd.DataFrame()
 
@@ -556,7 +625,6 @@ def compute_transition(my_df_dict, haplotype_left, haplotype_right, parent, orie
         parent = soimom
 
 
-
     '''Create a variable that stores likelihood values, that ..
        left vs. right haplotype belongs to a particular parent.
        This depends upon which parent was passed in this function'''
@@ -566,8 +634,8 @@ def compute_transition(my_df_dict, haplotype_left, haplotype_right, parent, orie
         transitions frequency. '''
     ## likelihood = prob(for any random emission) x prob(of any random transition) = 0.5 * 0.0625
     ## **Note: different level of value (prior) doesn't affect maxPd but only maxSum.
-    likelihood_hap_left = 0.25 * 0.0625  # lambda x: x
-    likelihood_hap_right = 0.25 * 0.0625  # lambda x: x
+    likelihood_hap_left = Decimal(0.25 * 0.0625)  # lambda x: x
+    likelihood_hap_right = Decimal(0.25 * 0.0625)  # lambda x: x
 
 
     ## Deprecated !!!
@@ -582,8 +650,8 @@ def compute_transition(my_df_dict, haplotype_left, haplotype_right, parent, orie
 
 
     '''Step 04 - A (i): Run 1st order markov chain on one block of unique "PI" data. '''
-    for v1, v2 in zip(orientation(list(enumerate(my_df_dict[soif1 + '_PG_al']))),
-                      itertools.islice(orientation(list(enumerate(my_df_dict[soif1 + '_PG_al']))), 1, None)):
+    for v1, v2 in zip(orientation(list(enumerate(my_df_dict[soif1 + ':PG_al']))),
+                      itertools.islice(orientation(list(enumerate(my_df_dict[soif1 + ':PG_al']))), 1, None)):
 
         # if reverse chain isn't considered, we can use this:
         #for v1, v2 in zip(enumerate(my_df_dict[soif1 + '_PG_al']),
@@ -739,9 +807,7 @@ def compute_transition(my_df_dict, haplotype_left, haplotype_right, parent, orie
 
 
 
-
-
-'''Step 04 - B: Estimate likelihood ratio and then segregate haplotypes. '''
+'''Step 04 - C: Estimate likelihood ratio and then segregate haplotypes. '''
 def compute_lods(likelihood_hap_left_dad, likelihood_hap_right_dad,
                  likelihood_hap_left_mom, likelihood_hap_right_mom,
                  haplotype_left, haplotype_right, data_by_pi):
@@ -749,38 +815,25 @@ def compute_lods(likelihood_hap_left_dad, likelihood_hap_right_dad,
 
     kite = 'hello'  # just a mock variable to highlight the doc string below
 
-    #print()
-    #print('debug marker')
-    #print(likelihood_hap_left_mom, likelihood_hap_left_dad)
-    #print(likelihood_hap_right_mom, likelihood_hap_right_dad)
-
-
     '''Segregate the haplotype and write it to a file. '''
+    lh_hapL_vs_hapR_is_pat_vs_mat = Decimal(
+        (likelihood_hap_left_dad / likelihood_hap_left_mom) /
+        (likelihood_hap_right_dad / likelihood_hap_right_mom))
 
-    #logOdds_hapL_vs_hapR_is_mat_vs_pat = log_Odds_Ratio = math.log2(
-     #   (likelihood_hap_left_mom / likelihood_hap_left_dad) /
-      #  (likelihood_hap_right_mom / likelihood_hap_right_dad))
-
-    lh_hapL_vs_hapR_is_mat_vs_pat = Decimal(
-        (likelihood_hap_left_mom / likelihood_hap_left_dad) /
-        (likelihood_hap_right_mom / likelihood_hap_right_dad))
-
-    log_Odds_Ratio = Decimal(lh_hapL_vs_hapR_is_mat_vs_pat).ln() / (Decimal('2').ln())
+    log_Odds_Ratio = Decimal(lh_hapL_vs_hapR_is_pat_vs_mat).ln() / (Decimal('2').ln())
 
     log_Odds_Ratio = round(float(log_Odds_Ratio), 3)
-    #print()
-    #print(log_Odds_Ratio)
 
-    del lh_hapL_vs_hapR_is_mat_vs_pat
+    del lh_hapL_vs_hapR_is_pat_vs_mat
 
 
     if log_Odds_Ratio >= float(lods_cut_off):
-        haplotype_mom = haplotype_left
-        haplotype_dad = haplotype_right
+        haplotype_dad = haplotype_left
+        haplotype_mom = haplotype_right
 
     elif log_Odds_Ratio <= -float(lods_cut_off):
-        haplotype_mom = haplotype_right
-        haplotype_dad = haplotype_left
+        haplotype_dad = haplotype_right
+        haplotype_mom = haplotype_left
 
     else:  # Cannot assign the haplotype, so sub the allele with Ns
         haplotype_mom = ['N']*len(haplotype_left)
@@ -790,12 +843,12 @@ def compute_lods(likelihood_hap_left_dad, likelihood_hap_right_dad,
     #### Write the final output for the given PI
     # pull the required part of original dataframe to write it to final output
     my_soif1_df = data_by_pi[[
-        'contig', 'pos', 'ref', 'all-alleles', soif1 + '_PI', soif1 + '_PG_al']].reset_index(drop=True)
+        'CHROM', 'POS', 'REF', 'all-alleles', soif1 + ':PI', soif1 + ':PG_al']].reset_index(drop=True)
 
 
     ## Output in long format
     hap_segregated_df_long = pd.DataFrame(
-        OrderedDict((('lods', log_Odds_Ratio), (mom_id, haplotype_mom), (dad_id, haplotype_dad))))
+        OrderedDict((('log2odds', log_Odds_Ratio), (dad_id, haplotype_dad), (mom_id, haplotype_mom))))
 
     # merge this segregated df to main df for f1soi
     updated_df_long = pd.concat([my_soif1_df, hap_segregated_df_long], axis=1)
@@ -803,23 +856,20 @@ def compute_lods(likelihood_hap_left_dad, likelihood_hap_right_dad,
 
     ## Output in wide format
        # transform the data structure to appropriate wide format
-    contig_w = my_soif1_df['contig'].tolist()[0]
-    pos_range = '-'.join([str(my_soif1_df['pos'].min()), str(my_soif1_df['pos'].max())])
-    soif1_PI = my_soif1_df[soif1 + '_PI'].tolist()[0]
+    contig_w = my_soif1_df['CHROM'].tolist()[0]
+    pos_range = '-'.join([str(my_soif1_df['POS'].min()), str(my_soif1_df['POS'].max())])
+    soif1_PI = my_soif1_df[soif1 + ':PI'].tolist()[0]
 
     updated_df_wide = pd.DataFrame(
         [[contig_w, pos_range, soif1_PI , '-'.join(haplotype_left), '-'.join(haplotype_right), log_Odds_Ratio,
-          '-'.join(haplotype_mom), '-'.join(haplotype_dad)]],
-        columns=['contig', 'pos_range', soif1 +'_PI', 'hap_left', 'hap_right', 'lods', mom_id, dad_id])
+          '-'.join(haplotype_dad), '-'.join(haplotype_mom)]],
+        columns=['CHROM', 'POS_Range', soif1 +':PI', 'hap_left', 'hap_right', 'log2odds', dad_id, mom_id])
 
 
     ## ** For future: update the haplotype statistics (at this position) if desired.
     ## The stats can have following headers
     # contig	ms02g_PI	phased_PI	total_haplotypes	phased_haplotypes	\
     # total_Vars	phased_Vars	Ref_in_Mat	Ref_in_Pat
-
-
-
 
     return updated_df_long, updated_df_wide
 
@@ -844,9 +894,8 @@ def compute_probs(pX_Y, pX, modeis):
     # returns emission or transition probs from "X" to "Y"
     #** variable "modeis" not used now. Use it in future.
 
-    return round(pX_Y / pX, 7)
-
-
+    return Decimal(pX_Y / pX)
+    #return round(pX_Y / pX, 7)
 
 
 ''' function to find appropriate sample names in each parental background '''
@@ -856,22 +905,17 @@ def find_samples(samples, header_):
 
     if 'pre:' in samples:
         samples = samples.lstrip('pre:').split(',')
-
-        # this is little redundant and can be optimized.
-        # ** But note that it take very less time to extract this data.
         sample_list = []
         for pref in samples:
             for names in header_:
                 if names.startswith(pref):
-                    sample_list.append(names.rstrip('_PI').rstrip('_PG_al'))
-
+                    sample_list.append(names.split(':')[0])
         sample_list = list(set(sample_list))
-        sample_list = [((x + '_PI'), (x + '_PG_al')) for x in sample_list]
+        sample_list = [((x + ':PI'), (x + ':PG_al')) for x in sample_list]
 
     else:
         sample_list = samples.split(',')
-        sample_list = [((x + '_PI'), (x + '_PG_al')) for x in sample_list]
-
+        sample_list = [((x + ':PI'), (x + ':PG_al')) for x in sample_list]
 
     return sample_list
 
