@@ -173,7 +173,7 @@ def main():
     # only read the header of the input haplotype file and ...
     # .. find the required samples (for maternal and paternal background)
     header_ = open(input_file, 'r').readline()
-    print(header_)
+    #print(header_)
 
     soimom = args.mat
     soimom = find_samples(soimom, header_)
@@ -244,8 +244,6 @@ def main():
           'be prepared for the sample of interest i.e "%s". '
               '    Only extendent haplotype block will be prepared.' % (soif1))
 
-    print('hapstats :', hapstats)
-
 
 
     '''Assign the number of process.
@@ -302,11 +300,11 @@ def main():
         # split the data by grouping and write it to the disk.
         for chr_, data_by_chr in my_df_by_contig:
             if chr_list == '':
-                pd.DataFrame.to_csv(data_by_chr, 'chunked_Data_' + soif1 + '/mydata_' + str(chr_),
+                pd.DataFrame.to_csv(data_by_chr, 'chunked_Data_' + soif1 + '/mydata:' + str(chr_),
                                     sep='\t', index=False, header=True)
             elif chr_list != '':
                 if str(chr_) in chr_list:
-                    pd.DataFrame.to_csv(data_by_chr, 'chunked_Data_' + soif1 + '/mydata_' + str(chr_),
+                    pd.DataFrame.to_csv(data_by_chr, 'chunked_Data_' + soif1 + '/mydata:' + str(chr_),
                                         sep='\t', index=False, header=True)
 
 
@@ -397,12 +395,18 @@ def multiproc(pool):
 
 
     # ''' Prepare the descriptive statistics of the phased (stitched) haplotypes if desired: '''
+    # ** future - move this code to a separate function.
     if hapstats == 'yes':
         with open(outputdir + '/' + soif1 + '_haplotype_stats.txt', 'w+') as out_stats:
             stats = result_merged_width.groupby(['CHROM'], sort = False)
-            out_stats.write('\t'.join(['CHROM', 'phasedBlock', 'unphasedBlock', 'numVarsInPhasedBlock',
+            out_stats.write('\t'.join(['CHROM', 'totalPhasedBlocks', 'totalUnPhasedBlocks', 'totalVarsPhasedBlocks',
+                                       'totalVarsUnPhasedBlocks', 'phasedBlocksPI', 'unphasedBlocksPI', 'numVarsInPhasedBlock',
                             'numVarsInUnPhasedBlock', 'log2oddsInPhasedBlock',
                             'log2oddsInUnPhasedBlock',	'totalNumOfBlock',	'totalNumOfVars']) + '\n')
+
+            # ** future: additional column to add: totalPhasedBlocks and totalunphasedBlocks,
+            # totalPhasedVars, totalunPhasedVars,
+            # Rename: phaseBlock to phasedBlocksPI
 
             for xath, valth in stats:
                 print('Computing descriptive statistics of the final haplotype for contig "%s". ' %str(xath))
@@ -429,6 +433,16 @@ def multiproc(pool):
                 num_vars_phased_blocks = [num_vars_in_allblocks[zth] for zth in idx_ofphasedblocks]
                 num_vars_unphased_blocks = [num_vars_in_allblocks[zth] for zth in idx_ofunphasedblocks]
 
+
+                # count total number of phased vs. unphased blocks (by PI)
+                # and the total number of variants in each category
+                total_phased_blocks = str(len(phasedblocks))
+                total_unphased_blocks = str(len(unphasedblocks))
+
+                total_vars_in_phasedblocks = str(sum(num_vars_phased_blocks))
+                total_vars_in_unphasedblocks = str(sum(num_vars_unphased_blocks))
+
+
                 # convert values to appropriate structure and string type before writing
                 phasedblocks = ','.join(str(x) for x in phasedblocks)
                 unphasedblocks = ','.join(str(x) for x in unphasedblocks)
@@ -447,13 +461,13 @@ def multiproc(pool):
                 count_vars = str(sum(num_vars_in_allblocks))
 
 
-                data_to_write = [str(xath), phasedblocks, unphasedblocks, num_vars_phased_blocks,
+                data_to_write = [str(xath), total_phased_blocks, total_unphased_blocks, total_vars_in_phasedblocks,
+                                 total_vars_in_unphasedblocks, phasedblocks, unphasedblocks, num_vars_phased_blocks,
                                  num_vars_unphased_blocks, log2_phased_blocks, log2_unphased_blocks,
                                  count_blocks, count_vars]
                 data_to_write = ['.' if x == '' else x for x in data_to_write]
 
                 out_stats.write('\t'.join(data_to_write))
-
                 out_stats.write('\n')
             print()
 
@@ -470,7 +484,7 @@ def process_by_contig(file_path):
 
     ''' Step 03 - A: Process data for each chromosome (contig) separately. '''
     good_data_by_contig = open(file_path, 'r')
-    chr_ = good_data_by_contig.name.split('_')[-1]
+    chr_ = good_data_by_contig.name.split(':')[-1]
     # this name identification might cause problem if "chr" has "_" in it's name i.e scaff_18
 
     print()
