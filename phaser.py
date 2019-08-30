@@ -1,255 +1,27 @@
-#!/home/bin/python3
-
-# Note: this program uses python 3
-# Function of the program: preparing a interactive version of the pHASE-Stitcher (using 1st order Markov chain)
-
-## Checking required modules
-print("Checking and importing required modules... ")
-
-
 import argparse
-from collections import OrderedDict
-from decimal import Decimal
-import os, time
-from io import StringIO
 import itertools
-from itertools import product
-from multiprocessing import Pool
-import pandas as pd
-import resource
+import os
 import re
+import resource
 import shutil
 import sys
+import time
 
 
-'''Overall structure of the program workflow:
-    01 > Load haplotype file with maternal, paternal and F1 hybrid data.
-    02 > Assign sample names to appropriate genotype background.
-    03 > Split data by chromosome and write into multiple files for multiprocessing.
-    04 > Now, use imap (lazy mapping) of each split of data.
-    05 > Group the data by unique "PI" index and then pass it to marko process.
-    06 > Compute the likelihood of each haplotype (left and right) in F1 RBphased blocks
-         beloging to maternal vs. paternal background.
-    07 > Based on the lods2CutOff score segregate the haplotype into maternal paternal background.
-'''
+from collections import OrderedDict
+from decimal import Decimal
+from io import StringIO
+from itertools import product
+from functools import partial
+from multiprocessing import Pool
+
+import pandas as pd
 
 
-def main():
-
-    print()
-    ''' printing authorship '''
-
-    print("#######################################################################")
-    print("        Welcome to phase-Stitcher version %s       " % 1.1)
-    print("  Author: kiran N' bishwa (bkgiri@uncg.edu, kirannbishwa01@gmail.com) ")
-    print("#######################################################################")
-    print()
-
-
-    print("Loading the argument variables and assigning values ....")
-
-    ''' Define required argument for interactive mode program. '''
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument("--nt",
-                        help="number of process to run -> "
-                             "The maximum number of processes that can be run at once is the number "
-                             "of different chromosomes (contigs) in the input haplotype file.",
-                        default=1, required=False)
-
-    parser.add_argument("--input",
-                        help="name of the input haplotype file -> "
-                             "This haplotype file should contain unique index represented by 'PI' and "
-                             "phased genotype represented by 'PG_al' for all the samples. ",
-                        required=True)
-
-    parser.add_argument("--pat",
-                        help="Paternal sample or comma separated sample names that "
-                             "belong to Paternal background. "
-                             "Sample group may also be assigned using prefix. "
-                             "Options: 'paternal sample name', 'comma separated samples', 'pre:...'. "
-                             "Unique prefix (or comma separated prefixes) should begin with 'pre:'. ",
-                        required=True)
-
-    parser.add_argument("--mat",
-                        help="Maternal sample or sample names (comma separated) that "
-                             "belong to maternal background. Sample group can also be "
-                             "assigned using unique prefix/es. "
-                             "Options: 'maternal sample name', 'comma separated samples', 'pre:...'. "
-                             "Unique prefix (or comma separated prefixes) should begin with 'pre:'. ",
-                        required=True)
-
-    parser.add_argument("--f1Sample",
-                        help="Name of the F1-hybrid sample. Please type the name of only one F1 sample.",
-                        required=True)
-
-    parser.add_argument("--outPatMatID",
-                        help="Prefix of the 'Paternal (dad)' and 'Maternal (mom)'genotype in the output file. "
-                             "This should be a maximum of three letter prefix separated by comma. "
-                             "Default: 'pat,mat'.",
-                        default='pat,mat', required=False)
-
-    parser.add_argument("--output", default='', type=str,
-                        help="Name of the output directory. "
-                             "Default: f1SampleName + '_stitched' ", required=False)
-
-    parser.add_argument("--lods",
-                        help="log(2) odds cutoff threshold required "
-                             "to assign maternal Vs. paternal haplotype segregation and stitching. ",
-                        default=5)
-    # note: log_odds_ratio 5 is 2^5 = 32 times likely
-
-    parser.add_argument("--culLH",
-                        help="Cumulative likelhood estimates -> "
-                             "The likelhoods for haplotype segregation can either be max-sum vs. max-product. "
-                             "Default: maxPd i.e max-product. "
-                             "Options: 'maxPd' or 'maxSum'. ",
-                        default='maxPd', required=False)
-
-    parser.add_argument("--chr", required = False, default="",
-                        help="Restrict haplotype stitching to a specific chromosome.")
-
-    parser.add_argument("--hapStats",
-                        help="Computes the descriptive statistics of final haplotype. "
-                             "Default: 'no'."
-                             "Option: 'yes', 'no' .",
-                        default='no', required=False)
-
-
-
-    ''' create a global argument variables and declare values of the global variables.
-            The values for the global variable are assigned using arguments (args.()) passed by user.'''
-    # this is necessary if arguments are declared at several functions using "args.variable" parameter.
-    global args;
-    args = parser.parse_args()# .. but keep it as it is.
-    print(args)
-
-    global output  # ** now used with "outputdir" - may change in future to control filename in output
-
-
-    print("#Step 01:  Checking the required files......\n");
-
-    #Step 01-B checks if the required files (vcfs) are provided or not
-    check_files = [args.mat, args.pat, args.f1Sample, args.input];
-    for xfile in check_files:
-        if xfile == "":
-            print('fatal error !!! ')
-            print("Please assign the required parameter : '%s' ." % (xfile));
-                # reports error message if the checked files isn't found
-            sys.exit()
-
-
-
-    ################## begins at ............
-    global output
-    global outputdir
-    global use_bed  # ** prolly deprecate
-    global soif1
-    global soimom
-    global mom_id
-    global soidad
-    global dad_id
-    global snp_threshold
-    global num_of_hets
-    global lods_cut_off
-    global maxed_as
-    global hapstats
-    global time01  # set a start time (used to time computational run for each chromosome vs. all processes)
-
-
-    print("Assigning values to the global variables ....")
-    # advantage of this method (assignment of global variable values at the beginning) ...
-    # ... is that we can change the program to non-interactive mode easily and
-    # point to specific values/files on this top part. This becomes helpful while debugging.
-
-    input_file = args.input  # the input haplotype file
-    # input_file = 'allele_table_for_phase_extender.txt'
-    print('  - using haplotype file "%s" ' % (input_file))
-
-    time01 = time.time()
-    soif1 = args.f1Sample
-    print('  - F1-hybrid of interest: "%s" ' % (soif1))
-
-
-    # only read the header of the input haplotype file and ...
-    # .. find the required samples (for maternal and paternal background)
-    header_ = open(input_file, 'r').readline()
-    #print(header_)
-
-    soimom = args.mat
-    soimom = find_samples(soimom, header_)
-
-    soidad = args.pat
-    soidad = find_samples(soidad, header_)
-
-
-
-    # prefix for mat,pat haplotype id
-    # ** by default treats the samples in "--mat" as maternal and "--pat" as paternal
-    pat_mat_id = args.outPatMatID
-    if pat_mat_id == 'pat,mat':
-        dad_id = 'pat_hap'
-        mom_id = 'mat_hap'
-    else:
-        dad_id = pat_mat_id.split(',')[0] + '_hap'
-        mom_id = pat_mat_id.split(',')[1] + '_hap'
-
-
-
-    # Assign the output directory
-    if args.output == '':
-        outputdir = soif1 + '_stitched'
-    elif args.output != '':
-        outputdir = args.output
-    if os.path.exists(outputdir):
-        shutil.rmtree(outputdir, ignore_errors=False, onerror=None)
-    os.makedirs(outputdir, exist_ok=True)
-
-
-    if args.chr != "":
-        chr_list = (args.chr).split(',')
-    else:
-        chr_list = ""
-
-
-    # assign number of process to be used
-    nt = int(args.nt)  # default, nt = 1
-    print('  - using "%s" processes ' % (nt))
-
-
-    lods_cut_off = int(args.lods)  # log_of_odds_cut_off, default = 5
-    print('  - using log2 odds cut off of "%s" ' % (lods_cut_off))
-
-
-    # add argument for max sum vs. max product of likelyhood estimates before calculating the LOD-score
-    maxed_as = args.culLH  # default, maxed_as = "*"
-    if maxed_as == 'maxSum':
-        max_is = 'max sum'
-        maxed_as = '+'
-    elif maxed_as == 'maxPd':
-        max_is = 'max product'
-        maxed_as = '*'
-    print('  - using "%s" to estimate the cumulative maximum likelyhood while segregating '
-          'the diploid haplotype block into maternal vs. paternal haplotype ' % (max_is))
-
-
-    # Add argument to compute descriptive statistics of the final
-    # print the hapstats to file and also plot histogram
-    if args.hapStats == 'yes':  # default, hapstats = 'no' ** ??
-        hapstats = 'yes'
-        print('  - statistics of the haplotype before and after extension will '
-              'be prepared for the sample of interest i.e "%s" ' %(soif1))
-    else:
-        hapstats = 'no'
-        print('  - statistics of the haplotype before and after extension will not '
-          'be prepared for the sample of interest i.e "%s". '
-              '    Only extendent haplotype block will be prepared.' % (soif1))
-
-
-
+def phase_stich(input_file,soif1, soimom, soidad, dad_id, mom_id, outputdir, chr_list, nt, lods_cut_off, max_is, maxed_as, hapstats):
     '''Assign the number of process.
-       **note: number of process should be declared after all the global variables are declared,
-       because each pool will need to copy the variable/value of global variables. '''
+    **note: number of process should be declared after all the global variables are declared,
+    because each pool will need to copy the variable/value of global variables. '''
     pool = Pool(processes=nt)  # number of pool to run at once; default at 1
 
     #### completed assignment of values to argument variables
@@ -311,7 +83,7 @@ def main():
 
 
     '''Step 02 - A: Now, pipe the procedure to next function for multiprocessing (i.e Step 02 - B) '''
-    multiproc(pool)
+    multiproc(pool,  outputdir, soif1, soidad, soimom, maxed_as, dad_id, mom_id, lods_cut_off, hapstats)
 
 
     '''** workflow, between step (02-A and 06) is passed onto other functions. '''
@@ -320,7 +92,7 @@ def main():
     '''Step 06: Clean the directory that is storing splitted dataframe. '''
 
     # remove the chunked data folder
-    #shutil.rmtree('chunked_Data_' + soif1, ignore_errors=False, onerror=None)
+    shutil.rmtree('chunked_Data_' + soif1, ignore_errors=False, onerror=None)
 
     print('The End :)')
 
@@ -328,7 +100,7 @@ def main():
 
 
 '''Step 02 - B : Pipe the data to multiprocessing environment. '''
-def multiproc(pool):
+def multiproc(pool,  outputdir, soif1, soidad, soimom, maxed_as, dad_id, mom_id, lods_cut_off, hapstats):
 
     print()
     time_all = time.time()
@@ -340,7 +112,8 @@ def multiproc(pool):
 
 
     '''This imap multiprocess take the pipeline to Step 03. '''
-    results = pool.imap(process_by_contig, file_path)
+    partial_func = partial(process_by_contig, outputdir = outputdir,  soif1 =  soif1,  soidad =  soidad,  soimom =  soimom,  maxed_as =  maxed_as,  dad_id =  dad_id,  mom_id =  mom_id,  lods_cut_off =  lods_cut_off)
+    results = pool.imap(partial_func, file_path)
 
     pool.close()
     pool.join()
@@ -478,7 +251,7 @@ def multiproc(pool):
 
 
 '''Step 03: Process each contig separately with lazy mapping using "imap" multiprocessing. '''
-def process_by_contig(file_path):
+def process_by_contig(file_path, outputdir, soif1, soidad, soimom, maxed_as, dad_id, mom_id, lods_cut_off):
 
     #print()
     time_chr = time.time()
@@ -531,38 +304,38 @@ def process_by_contig(file_path):
             ''' likelihood of a haplotype (left vs. right) belonging to a parent (dad). '''
             # on forward chain
             likelihood_hap_left_dad_fwd, likelihood_hap_right_dad_fwd = \
-                compute_transition(my_df_dict, haplotype_left, haplotype_right, parent='dad', orientation=lambda x: x)
+                compute_transition(my_df_dict, haplotype_left, haplotype_right, soidad, soimom, parent='dad', orientation=lambda x: x, soif1 = soif1, maxed_as= maxed_as)
 
             # on reverse chain
             likelihood_hap_left_dad_rev, likelihood_hap_right_dad_rev = \
-                compute_transition(my_df_dict, haplotype_left, haplotype_right, parent='dad', orientation=reversed)
+                compute_transition(my_df_dict, haplotype_left, haplotype_right, soidad, soimom, parent='dad', orientation=reversed,soif1 = soif1, maxed_as= maxed_as)
 
 
 
             ''' likelihood of a haplotype (left vs. right) belonging to (mom) or maternal background. '''
             # on forward chain
             likelihood_hap_left_mom_fwd, likelihood_hap_right_mom_fwd = \
-                compute_transition(my_df_dict, haplotype_left, haplotype_right, parent='mom', orientation=lambda x: x)
+                compute_transition(my_df_dict, haplotype_left, haplotype_right,soidad, soimom, parent='mom', orientation=lambda x: x,soif1 = soif1, maxed_as= maxed_as)
 
             # on reverse chain
             likelihood_hap_left_mom_rev, likelihood_hap_right_mom_rev = \
-                compute_transition(my_df_dict, haplotype_left, haplotype_right, parent='mom', orientation=reversed)
+                compute_transition(my_df_dict, haplotype_left, haplotype_right,soidad, soimom, parent='mom', orientation=reversed,soif1 = soif1, maxed_as= maxed_as)
 
 
 
             '''Step 04 - B: Maximize the likelihood estimate (using maxSum or maxProduct). '''
             likelihood_hap_left_dad = cumulate_likelihoods([
-                likelihood_hap_left_dad_fwd, likelihood_hap_left_dad_rev])
+                likelihood_hap_left_dad_fwd, likelihood_hap_left_dad_rev], maxed_as)
 
             likelihood_hap_right_dad = cumulate_likelihoods([
-                likelihood_hap_right_dad_fwd, likelihood_hap_right_dad_rev])
+                likelihood_hap_right_dad_fwd, likelihood_hap_right_dad_rev], maxed_as)
 
 
             likelihood_hap_left_mom = cumulate_likelihoods([
-                likelihood_hap_left_mom_fwd, likelihood_hap_left_mom_rev])
+                likelihood_hap_left_mom_fwd, likelihood_hap_left_mom_rev], maxed_as)
 
             likelihood_hap_right_mom = cumulate_likelihoods([
-                likelihood_hap_right_mom_fwd, likelihood_hap_right_mom_rev])
+                likelihood_hap_right_mom_fwd, likelihood_hap_right_mom_rev], maxed_as)
 
 
 
@@ -570,7 +343,7 @@ def process_by_contig(file_path):
                             to compute log2Odds and segregate the haplotypes into mom vs. dad background. '''
             updated_df_long, updated_df_wide = compute_lods(likelihood_hap_left_dad, likelihood_hap_right_dad,
                          likelihood_hap_left_mom, likelihood_hap_right_mom, haplotype_left, haplotype_right,
-                                                            data_by_pi)
+                                                            data_by_pi,soif1, dad_id, mom_id, lods_cut_off)
 
 
             ### Store the pandas dataframe as list
@@ -627,7 +400,7 @@ def process_by_contig(file_path):
 
 '''Step 04 - A : Estimate the likelihood of a haplotype being mom vs. dad. This function needs inputs:
     - RBphased data (as my df dict), left vs. right haplotype for soif1, parents, orientation (fwd vs. rev). '''
-def compute_transition(my_df_dict, haplotype_left, haplotype_right, parent, orientation):
+def compute_transition(my_df_dict, haplotype_left, haplotype_right, soidad, soimom, parent, orientation, soif1, maxed_as):
 
     #print()
     #print('parent: ', parent)
@@ -788,11 +561,11 @@ def compute_transition(my_df_dict, haplotype_left, haplotype_right, parent, orie
 
         likelihood_hap_left = cumulate_likelihoods(
             [likelihood_hap_left,
-             nucleotide_prob_dict[haplotype_left[n1]] * transition_prob_dict[hap_transition_left]])
+             nucleotide_prob_dict[haplotype_left[n1]] * transition_prob_dict[hap_transition_left]],maxed_as)
 
         likelihood_hap_right = cumulate_likelihoods(
             [likelihood_hap_right,
-             nucleotide_prob_dict[haplotype_right[n1]] * transition_prob_dict[hap_transition_right]])
+             nucleotide_prob_dict[haplotype_right[n1]] * transition_prob_dict[hap_transition_right]],maxed_as)
 
         #print('likelihoods left and right')
         #print(likelihood_hap_left, likelihood_hap_right)
@@ -825,7 +598,7 @@ def compute_transition(my_df_dict, haplotype_left, haplotype_right, parent, orie
 '''Step 04 - C: Estimate likelihood ratio and then segregate haplotypes. '''
 def compute_lods(likelihood_hap_left_dad, likelihood_hap_right_dad,
                  likelihood_hap_left_mom, likelihood_hap_right_mom,
-                 haplotype_left, haplotype_right, data_by_pi):
+                 haplotype_left, haplotype_right, data_by_pi, soif1,dad_id, mom_id, lods_cut_off):
 
 
     kite = 'hello'  # just a mock variable to highlight the doc string below
@@ -949,7 +722,7 @@ def prod(iterable):
     return value
 
 
-def cumulate_likelihoods(items):
+def cumulate_likelihoods(items, maxed_as):
     if maxed_as == '+':
         cuml_is = sum(items)
 
@@ -963,10 +736,3 @@ def cumulate_likelihoods(items):
 ''' to monitor memory usage. '''
 def current_mem_usage():
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.
-
-
-
-if __name__ == "__main__":
-    main();
-
-
