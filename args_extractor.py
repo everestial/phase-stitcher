@@ -89,8 +89,8 @@ def args_to_values(args):
     
 
 
-''' function to find appropriate sample names in each parental background '''
 def find_samples(samples, header_):
+    ''' function to find appropriate sample names in each parental background '''
 
     header_ = header_.rstrip('\n').split('\t')
 
