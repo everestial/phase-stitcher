@@ -2,6 +2,9 @@ import filecmp
 import os
 import shutil
 import tempfile
+import webbrowser
+import difflib
+import pathlib
 
 import pytest
 
@@ -61,8 +64,22 @@ def is_same_dir(dir1, dir2):
         print(compared.left_only)
         print(compared.right_only)
         print(compared.diff_files)
+        for f in compared.diff_files:
+            diff_html(dir1+'/'+f, dir2+'/'+f)
         return False
     for subdir in compared.common_dirs:
         if not is_same_dir(os.path.join(dir1, subdir), os.path.join(dir2, subdir)):
             return False
     return True 
+
+def diff_html(filepath1, filepath2):
+
+    fromlines = pathlib.Path(filepath1).read_text().splitlines()
+    tolines = pathlib.Path(filepath2).read_text().splitlines()
+
+    diff = difflib.HtmlDiff(tabsize=4,).make_file(fromlines, tolines)
+    # is_same_dir(file1, file2)
+    with tempfile.NamedTemporaryFile('w', delete=False, suffix='.html') as f:
+        url = 'file://' + f.name
+        f.write(diff)
+    webbrowser.open_new_tab(url)

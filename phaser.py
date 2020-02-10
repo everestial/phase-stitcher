@@ -17,7 +17,6 @@ from multiprocessing import Pool
 
 import pandas as pd
 
-
 def phase_stich(input_file,soif1, soimom, soidad, dad_id, mom_id, outputdir, chr_list, nt, lods_cut_off, max_is, maxed_as, hapstats):
     '''Assign the number of process.
     **note: number of process should be declared after all the global variables are declared,
@@ -58,32 +57,32 @@ def phase_stich(input_file,soif1, soimom, soidad, dad_id, mom_id, outputdir, chr
 
         ''' using pandas dataframe to load the data as df and dictionary and group by contig'''
         # ** Note: Possible future optimization using "dask" module
-        my_df_by_contig = my_df.groupby('CHROM', sort=False)
+        my_df_by_contig = my_df.groupby('CHROM', sort=True)
 
 
-        '''Step 01 - B: Starting multiprocessing after splitting the dataframe by chromosome.'''
-        # multiprocessing of data (by lazy "imap" process)
+        # '''Step 01 - B: Starting multiprocessing after splitting the dataframe by chromosome.'''
+        # # multiprocessing of data (by lazy "imap" process)
 
-        # folder for storing the splitted dataframes
-        if os.path.exists('chunked_Data_' + soif1):
-            shutil.rmtree('chunked_Data_' + soif1, ignore_errors=False, onerror=None)
-        os.makedirs('chunked_Data_' + soif1, exist_ok=True)
+        # # folder for storing the splitted dataframes
+        # if os.path.exists('chunked_Data_' + soif1):
+        #     shutil.rmtree('chunked_Data_' + soif1, ignore_errors=False, onerror=None)
+        # os.makedirs('chunked_Data_' + soif1, exist_ok=True)
 
 
-        # split the data by grouping and write it to the disk.
-        for chr_, data_by_chr in my_df_by_contig:
-            if chr_list == '':
-                pd.DataFrame.to_csv(data_by_chr, 'chunked_Data_' + soif1 + '/mydata:' + str(chr_),
-                                    sep='\t', index=False, header=True)
-            elif chr_list != '':
-                if str(chr_) in chr_list:
-                    pd.DataFrame.to_csv(data_by_chr, 'chunked_Data_' + soif1 + '/mydata:' + str(chr_),
-                                        sep='\t', index=False, header=True)
+        # # split the data by grouping and write it to the disk.
+        # for chr_, data_by_chr in my_df_by_contig:
+        #     if chr_list == '':
+        #         pd.DataFrame.to_csv(data_by_chr, 'chunked_Data_' + soif1 + '/mydata:' + str(chr_),
+        #                             sep='\t', index=False, header=True)
+        #     elif chr_list != '':
+        #         if str(chr_) in chr_list:
+        #             pd.DataFrame.to_csv(data_by_chr, 'chunked_Data_' + soif1 + '/mydata:' + str(chr_),
+        #                                 sep='\t', index=False, header=True)
 
 
 
     '''Step 02 - A: Now, pipe the procedure to next function for multiprocessing (i.e Step 02 - B) '''
-    multiproc(pool,  outputdir, soif1, soidad, soimom, maxed_as, dad_id, mom_id, lods_cut_off, hapstats)
+    multiproc(pool,  outputdir, soif1, soidad, soimom, maxed_as, dad_id, mom_id, lods_cut_off, hapstats, my_df_by_contig)
 
 
     '''** workflow, between step (02-A and 06) is passed onto other functions. '''
@@ -92,7 +91,7 @@ def phase_stich(input_file,soif1, soimom, soidad, dad_id, mom_id, outputdir, chr
     '''Step 06: Clean the directory that is storing splitted dataframe. '''
 
     # remove the chunked data folder
-    shutil.rmtree('chunked_Data_' + soif1, ignore_errors=False, onerror=None)
+    # shutil.rmtree('chunked_Data_' + soif1, ignore_errors=False, onerror=None)
 
     print('The End :)')
 
@@ -100,20 +99,22 @@ def phase_stich(input_file,soif1, soimom, soidad, dad_id, mom_id, outputdir, chr
 
 
 '''Step 02 - B : Pipe the data to multiprocessing environment. '''
-def multiproc(pool,  outputdir, soif1, soidad, soimom, maxed_as, dad_id, mom_id, lods_cut_off, hapstats):
+def multiproc(pool,  outputdir, soif1, soidad, soimom, maxed_as, dad_id, mom_id, lods_cut_off, hapstats, my_df_by_contig):
 
     print()
     time_all = time.time()
 
 
     ''' Step 02 - B: Start, multiprocessing/threading - process each contig separately. '''
-    path = 'chunked_Data_' + soif1 + '/'  # opens the a temp folder
-    file_path = sorted([path + item for item in os.listdir(path)], key=numericalSort)
+    # path = 'chunked_Data_' + soif1 + '/'  # opens the a temp folder
+    # file_path = sorted([path + item for item in os.listdir(path)], key=numericalSort)
 
 
     '''This imap multiprocess take the pipeline to Step 03. '''
+    df_list = (my_df_by_contig.get_group(x) for x in my_df_by_contig.groups)
+    # df_list = my_df_by_contig
     partial_func = partial(process_by_contig, outputdir = outputdir,  soif1 =  soif1,  soidad =  soidad,  soimom =  soimom,  maxed_as =  maxed_as,  dad_id =  dad_id,  mom_id =  mom_id,  lods_cut_off =  lods_cut_off)
-    results = pool.imap(partial_func, file_path)
+    results = pool.imap(partial_func, df_list)
 
     pool.close()
     pool.join()
@@ -256,18 +257,20 @@ def process_by_contig(file_path, outputdir, soif1, soidad, soimom, maxed_as, dad
     #print()
     time_chr = time.time()
 
-    ''' Step 03 - A: Process data for each chromosome (contig) separately. '''
-    good_data_by_contig = open(file_path, 'r')
-    chr_ = good_data_by_contig.name.split(':')[-1]
+    # ''' Step 03 - A: Process data for each chromosome (contig) separately. '''
+    # good_data_by_contig = open(file_path, 'r')
+    # chr_ = good_data_by_contig.name.split(':')[-1]
     # this name identification might cause problem if "chr" has "_" in it's name i.e scaff_18
 
     print()
-    print('Starting markov transition for chromosome "%s" ' % (chr_))
+    # print('Starting markov transition for chromosome "%s" ' % (chr_))
     print('##########################')
 
 
     ## Load the data into pandas dataframe and again groupby unique "PI" values
-    contigs_group = pd.read_csv(StringIO(good_data_by_contig.read()), sep='\t')
+    # contigs_group = pd.read_csv(StringIO(good_data_by_contig.read()), sep='\t')
+    contigs_group = file_path
+
 
     # groupby "PI index" and feed it to transition computation
     my_df_grouped = contigs_group.groupby(soif1 + ':PI', sort=False)
@@ -372,7 +375,7 @@ def process_by_contig(file_path, outputdir, soif1, soidad, soimom, maxed_as, dad
 
 
 
-    print(' - Phase-extension completed for contig "%s" in %.6f seconds' % (chr_, time.time() - time_chr))
+    # print(' - Phase-extension completed for contig "%s" in %.6f seconds' % (chr_, time.time() - time_chr))
     print(' - Worker maximum memory usage: %.2f (mb)' % (current_mem_usage()))
     print()
 
