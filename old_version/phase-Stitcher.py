@@ -121,7 +121,8 @@ def main():
             The values for the global variable are assigned using arguments (args.()) passed by user.'''
     # this is necessary if arguments are declared at several functions using "args.variable" parameter.
     global args;
-    args = parser.parse_args()  # .. but keep it as it is.
+    args = parser.parse_args()# .. but keep it as it is.
+    print(args)
 
     global output  # ** now used with "outputdir" - may change in future to control filename in output
 

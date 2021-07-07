@@ -1,8 +1,8 @@
 # phASE-Stitcher
 
-***A python program to segregate and stitch the ReadBackPhased genotypes in F1 hybrids to prepare 
+***A python program to segregate and stitch the ReadBackPhased genotypes in F1 hybrids to prepare
 a genome wide haplotype using first order markov chain and transition probabilities.\
-This tool can be used as a companion tool along with 
+This tool can be used as a companion tool along with
 [`phase-Extender`](https://github.com/everestial/phase-Extender) or as a standalone tool.***
 
 Developed by [Bishwa K. Giri](mailto:kirannbishwa01@gmail.com) in 
@@ -10,22 +10,24 @@ the [Remington Lab](https://biology.uncg.edu/people/david-remington/) at the
 University of North Carolina at Greensboro, Biology department.
 
 ## Citation
+
 Giri, B. K., Remington D. L. Haplotype phase extension and preparation of 
 diploid genome using phase-Extender and phase-Stitcher. biorxiv (2018) [not uploaded yet].
 
 ## AUTHOR/SUPPORT
+
 Bishwa K. Giri (bkgiri@uncg.edu; kirannbishwa01@gmail.com) \
 Support @ https://groups.google.com/d/forum/phase-extender
 
 ## Intro to ReadBackPhasing
+
 **Check these links for details on readbackphasing**
-- https://software.broadinstitute.org/gatk/documentation/tooldocs/3.8-0/org_broadinstitute_gatk_tools_walkers_phasing_ReadBackedPhasing.php
-- https://github.com/secastel/phaser/tree/master/phaser
 
-<br>
-<br>
+- <https://software.broadinstitute.org/gatk/documentation/tooldocs/3.8-0/org_broadinstitute_gatk_tools_walkers_phasing_ReadBackedPhasing.php>
+- <https://github.com/secastel/phaser/tree/master/phaser>
 
-# BACKGROUND
+## BACKGROUND
+
 Haplotype phasing is a second "go to" problem in bioinformatics after read alignment.
 The importance of haplotype phasing applies directly to the analyses of ASE (allele specific expression),
 preparation of extended haplotype for EHH (extended haplotype homozygosity) test,
@@ -37,6 +39,7 @@ the variants that are called using that alignment data (SAM, BAM files).
 Gene expression quantification using sequence reads is occupying a dominant and standard sphere of functional
 analyses of putative genetic loci.
 Quantification of gene expression as a test of phenotypic differences comes in two flavor:
+
   - DE (differential expression) > gene expression differences quantified between two individuals or 
   groups categorized by population, treatments, space or time.
   - ASE (allele specific expression) > gene expression differences quantified between the two alleles of 
@@ -81,7 +84,7 @@ explained below:**
   Rather phasing can be casually approached by supplying genotype data from `maternal vs. parental` background.
 
 
-## ![#f03c15](https://placehold.it/15/f03c15/000000?text=+)Data Requirements
+## Data Requirements
 
 **phASE-Stitcher** can be used with the multi-sample vcf files produced by GATK pipeline or other tools that generate
 readbackphased haplotype blocks in the output VCF.
@@ -94,48 +97,53 @@ See, this example for data structure of input haplotype file
 
 
 ## Algorithm
+
 For the **mcve** regarding the algorithm see this issue on [**stackoverflow**]() and/or [**my blog**](). 
 
-<br>
-<br>
+## Tutorial
 
-# Tutorial
+### Prerequisites
 
-## Setup
-**phase-Stitcher** is written in python3 interpreter. So, it can be directly run using the **".py"** file,
-given all the required modules (dependencies) are installed.
+**phASE-Stitcher** is written in python3, so you need to have python3 installed on your system to run this code locally. If you don't have python installed then, you can install from [here](https://www.python.org/downloads/). For linux; you can get latest python3 by:
 
-**Runs on `Python 3.x` and has the following dependencies:**
+`sudo apt-get install python3`
 
-  - [argparse](https://docs.python.org/3/library/argparse.html)
-  - [collections](https://docs.python.org/3/library/collections.html?highlight=collections#module-collections)
-  - [itertools](https://docs.python.org/3/library/itertools.html?highlight=itertools)
-  - [io](https://docs.python.org/3/library/io.html?highlight=io#module-io)
-  - [math](https://docs.python.org/3/library/math.html)
-  - [multiprocessing](https://docs.python.org/3/library/multiprocessing.html?highlight=multiprocessing#)
-  - [pandas](http://pandas.pydata.org/)
-  - [re](https://docs.python.org/3/library/re.html?highlight=re#module-re)
-  - [resource](https://docs.python.org/3/library/resource.html?highlight=resource#module-resource)
-  - [time](https://docs.python.org/3/library/time.html?highlight=time#module-time)
-  - [shutil](https://docs.python.org/3/library/shutil.html?highlight=shutil#module-shutil)
-  
-<br>
-  
-## Installation
-```
-pip3 install -r requirements.txt
+### Installation  and setup
 
-#Or, if sudo previlages required, use:
-sudo pip3 install -r requirements.txt
+1. Clone this repo.
+
+``` bash
+git clone https://github.com/everestial/phASE-Stitcher
+cd phASE-Stitcher
 ```
 
-**If there are issues with installation while using `requirements.txt`, 
-install each dependencies individually.**\
-e.g: `sudo python3 -m pip install pandas`  
-  
-<br>
+1. Make virtual env for python and install requirements.
+
+``` bash
+python3 -m venv .env
+source .env/bin/activate   # for linux
+.env\Scripts\activate      # for windows
+pip install -r requirements.txt
+```
+
+OR, you can install latest versions individually by:
+
+``` bash
+pip install pandas numpy matplotlib
+
+```
+
+
+1. To run tests locally:
+
+  ``` bash
+    pip install pytest
+    pytest .
+   ```
+
 
 ## Usage
+
   Requires a readbackphased `haplotype file` as input and returns segregated and stitched haplotype file in both wide 
   and long format. Descriptive statistics of the final haplotype can also be produced if desired.
 
@@ -146,9 +154,11 @@ of `input files` and know-how about running `phase-Stitcher`.
 <br>
 
 ## Input data
+
 ***haplotype file (required):*** Input `haplotype` file. Should contain `PI` and `PG_al` values for each sample.
 
 ### Performance Related
+
 * **--nt** _(1)_ - maximum number of processes to run at once. 
 The maximum number of processes is limited to number of chromosomes (contigs) in the input haplotype file. 
 
@@ -231,15 +241,7 @@ and unphased haplotype blocks and if they were assigned to final genome wide hap
 **Note:** - The **block index i.e PI** in **_phasedBlock_** and in **_unphasedBlock_**, 
 and it's associated statistics are in order.
 
-<br>
-<br>
+## Some Q/A on phase-stitcher
 
-## ![#f03c15](https://placehold.it/15/f03c15/000000?text=+)Some Q/A on phase-stitcher: 
-The conjoined **Q/A** for **_phase stitcher_** is covered under **Q/A** for 
+The conjoined **Q/A** for **_phase stitcher_** is covered under **Q/A** for
 [phase-extender](https://github.com/everestial/phase-Extender#some-qa-on-phase-extender)
-
-
-
-
-
-
