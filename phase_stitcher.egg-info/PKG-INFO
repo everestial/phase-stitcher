@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: phase-stitcher
-Version: 0.0.2
+Version: 0.0.3
 Summary: a python program to stitch the ReadBack phased haplotypes in F1 hybrids.
 Home-page: https://github.com/everestial/pHASE-Stitcher
 Author: Bishwa K. Giri

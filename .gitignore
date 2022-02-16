@@ -15,3 +15,6 @@ chunked_Data_*/
 build/
 docs/
 temp/
+
+phase_stitcher.egg-info/
+dist/
