@@ -1,0 +1,4 @@
+numpy>=1.22
+matplotlib>=3
+pandas>=1
+dask>=2021

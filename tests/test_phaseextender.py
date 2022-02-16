@@ -10,7 +10,7 @@ import pytest
 from collections import namedtuple
 
 
-from phaser import phase_stich
+from phase_stitcher.phaser import phase_stich
 
 soi_meta_cls = namedtuple('soi_meta_cls','soif1, soimom, soidad, dad_id, mom_id')
 

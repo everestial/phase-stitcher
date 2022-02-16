@@ -9,9 +9,9 @@ from multiprocessing import Pool
 
 import pandas as pd
 import dask.dataframe as dd
-from compute_stats import compute_stats
-from compute_transition import compute_lods, compute_transition, cumulate_likelihoods
-from utils import current_mem_usage
+from phase_stitcher.compute_stats import compute_stats
+from phase_stitcher.compute_transition import compute_lods, compute_transition, cumulate_likelihoods
+from phase_stitcher.utils import current_mem_usage
 
 # from dowser.utils import launch_memory_usage_server
 # launch_memory_usage_server()

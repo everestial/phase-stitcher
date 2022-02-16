@@ -1,0 +1,4 @@
+[console_scripts]
+phase-Stitcher = phase_stitcher.__main__:main
+phase-stitcher = phase_stitcher.__main__:main
+phase_stitcher = phase_stitcher.__main__:main

@@ -1,10 +1,10 @@
 import sys
 import argparse
 
-from args_builder import get_args
-from args_extractor import args_to_values
-from utils import print_authorship
-from phaser import phase_stich
+from phase_stitcher.args_builder import get_args
+from phase_stitcher.args_extractor import args_to_values
+from phase_stitcher.utils import print_authorship
+from phase_stitcher.phaser import phase_stich
 
 
 def main():
