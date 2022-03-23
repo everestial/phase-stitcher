@@ -282,4 +282,3 @@ and it's associated statistics are in order.
 ## Some Q/A on phase-stitcher
 
 The conjoined **Q/A** for **_phase stitcher_** is covered under **Q/A** for
-[phase-extender](https://github.com/everestial/phase-Extender#some-qa-on-phase-extender)
