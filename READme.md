@@ -1,4 +1,4 @@
-# PhaseStitcherDEV
+# PhaseStitcher
 
 ***A python program to segregate and stitch the ReadBackPhased genotypes in F1 hybrids to prepare
 a genome wide haplotype using first order markov chain and transition probabilities.\
@@ -8,6 +8,25 @@ This tool can be used as a companion tool along with
 Developed by [Bishwa K. Giri](mailto:kirannbishwa01@gmail.com) in
 the [Remington Lab](https://biology.uncg.edu/people/david-remington/) at the
 University of North Carolina at Greensboro, Biology department.
+
+- [PhaseStitcher](#phasestitcher)
+  - [Citation](#citation)
+  - [AUTHOR/SUPPORT](#authorsupport)
+  - [Intro to ReadBackPhasing](#intro-to-readbackphasing)
+  - [BACKGROUND](#background)
+  - [Data Requirements](#data-requirements)
+  - [Algorithm](#algorithm)
+  - [Tutorial](#tutorial)
+    - [Prerequisites](#prerequisites)
+    - [Installation from pypi:](#installation-from-pypi)
+    - [Installation  and setup from source (Optional)](#installation--and-setup-from-source-optional)
+  - [Usage](#usage)
+  - [Sample example](#sample-example)
+  - [Output Files](#output-files)
+    - [*f1Sample*_haplotype_long.txt](#f1sample_haplotype_longtxt)
+    - [*f1Sample*_haplotype_wide.txt](#f1sample_haplotype_widetxt)
+    - [*f1Sample*_haplotype_stats.txt](#f1sample_haplotype_statstxt)
+  - [Some Q/A on phase-stitcher](#some-qa-on-phase-stitcher)
 
 ## Citation
 
@@ -107,7 +126,19 @@ For the **mcve** regarding the algorithm see this issue on [**stackoverflow**]()
 
 `sudo apt-get install python3`
 
-### Installation  and setup
+### Installation from pypi:
+
+PhaseStitcher is hosted on pypi. So, you can install it using pip as:
+```bash
+$ pip install phase-stitcher
+
+# After installation is complete you can run help function to get its parameters.
+
+$ phase-stitcher -h
+```
+Now you can jump to usage and replace `python3 phase_stitcher.py` with `phase-stitcher`.
+
+### Installation  and setup from source (Optional)
 
 1. Clone this repo.
 
@@ -141,57 +172,71 @@ pip install pandas numpy matplotlib
 
 ## Usage
 
+```
+$ phase-stitcher --help
+usage: phase-stitcher [-h] [--nt NT] --input INPUT --pat PAT --mat MAT --f1Sample F1SAMPLE [--outPatMatID OUTPATMATID] [--output OUTPUT]
+                      [--lods LODS] [--culLH CULLH] [--chr CHR] [--hapStats HAPSTATS]
+
+options:
+  -h, --help            show this help message and exit
+  --nt NT               number of process to run -> The maximum number of processes that can be run at once is the number of different chromosomes
+                        (contigs) in the input haplotype file.
+  --input INPUT         name of the input haplotype file -> This haplotype file should contain unique index represented by 'PI' and phased genotype
+                        represented by 'PG_al' for all the samples.
+  --pat PAT             Paternal sample or comma separated sample names that belong to Paternal background. Sample group may also be assigned using
+                        prefix. Options: 'paternal sample name', 'comma separated samples', 'pre:...'. Unique prefix (or comma separated prefixes)
+                        should begin with 'pre:'.
+  --mat MAT             Maternal sample or sample names (comma separated) that belong to maternal background. Sample group can also be assigned
+                        using unique prefix/es. Options: 'maternal sample name', 'comma separated samples', 'pre:...'. Unique prefix (or comma
+                        separated prefixes) should begin with 'pre:'.
+  --f1Sample F1SAMPLE   Name of the F1-hybrid sample. Please type the name of only one F1 sample.
+  --outPatMatID OUTPATMATID
+                        Prefix of the 'Paternal (dad)' and 'Maternal (mom)'genotype in the output file. This should be a maximum of three letter
+                        prefix separated by comma. Default: 'pat,mat'.
+  --output OUTPUT       Name of the output directory. Default: f1SampleName + '_stitched'
+  --lods LODS           log(2) odds cutoff threshold required to assign maternal Vs. paternal haplotype segregation and stitching.
+  --culLH CULLH         Cumulative likelhood estimates -> The likelhoods for haplotype segregation can either be max-sum vs. max-product. Default:
+                        maxPd i.e max-product. Options: 'maxPd' or 'maxSum'.
+  --chr CHR             Restrict haplotype stitching to a specific chromosome.
+  --hapStats HAPSTATS   Computes the descriptive statistics of final haplotype. Default: 'no'.Option: 'yes', 'no' .
+
+```
+
+>NOTE Input haplotype file should contain `PI` and `PG_al` values for each sample.
+
   Requires a readbackphased `haplotype file` as input and returns segregated and stitched haplotype file in both wide
   and long format. Descriptive statistics of the final haplotype can also be produced if desired.
 
 Check this detailed [step by step tutorial](https://github.com/everestial/pHASE-Stitcher/wiki) for preparation
 of `input files` and know-how about running `phase-Stitcher`.
 
-## Input data
+## Sample example 
+```
+$ phase-stitcher --nt 1 --input tests/inputs/haplotype_file01.txt --mat MA605 --pat Sp21 --f1Sample ms02g --culLH maxSum --lods 3 --hapStats yes
 
-***haplotype file (required):*** Input `haplotype` file. Should contain `PI` and `PG_al` values for each sample.
+  - using haplotype file "tests/inputs/haplotype_file01.txt" 
+  - F1-hybrid of interest: "ms02g" 
+  - using "1" processes 
+  - using log2 odds cut off of "3" 
+  - using "max sum" to estimate the cumulative maximum likelyhood while segregating the diploid haplotype block into maternal vs. paternal haplotype 
+  - statistics of the haplotype before and after extension will be prepared for the sample of interest i.e "ms02g" 
+#######################################################################
+        Welcome to phase-Stitcher version 1.2       
+  Author: kiran N' bishwa (bkgiri@uncg.edu, kirannbishwa01@gmail.com) 
+#######################################################################
 
-### Performance Related
 
-**--nt** _(1)_ - maximum number of processes to run at once.
-The maximum number of processes is limited to number of chromosomes (contigs) in the input haplotype file.
+##########################
+ - Worker maximum memory usage: 85008.00 (mb)
 
-## Arguments
+Completed haplotype segregation and stitching for all the chromosomes.
+Time elapsed: '0.341528' sec. 
+ - Global maximum memory usage: 87792.00 (mb)
+Completed writing the dataframes .....
+The End :)
+```
 
-### Required
-
-- **--f1Sample** - name of the f1 hybrid sample of interest.
-It should refer to a single sample in the haplotype the file.
-- **--pat** - Paternal sample or comma separated sample names that
-                        belong to "paternal" background. Sample group may also
-                        be assigned using prefix. Options: 'paternal sample
-                        name', 'comma separated samples', 'pre:...'. Unique
-                        prefix (or comma separated prefixes) should begin with
-                        'pre:'.
-- **--mat** - Maternal sample or sample names (comma separated) that
-                        belong to "maternal" background. Sample group can also
-                        be assigned using unique prefix/es. Options: 'maternal
-                        sample name', 'comma separated samples', 'pre:...'.
-                        Unique prefix (or comma separated prefixes) should
-                        begin with 'pre:'.
-
-### Optional
-
-- **--python_string** _(python3)_ - Calls `python 3` interpreter to run the program.
-- **--output** _(f1Sample_extended)_ - Name of the output directory.
-- **----outPatMatID**_(pat,mat)_- Prefix of the **paternal (dad)** and **maternal (mom)** genotype in the output file.
-                             This should be a maximum of three letter prefix separated by comma.-
-- **--lods** _(5)_ - log(2) odds cutoff threshold required to assign maternal Vs. paternal
-                               haplotype segregation and stitching.
-               &emsp; &emsp; - Positive calculated log2Odd above lods cut off will assign the left haplotype to paternal allele.\
-               &emsp; &emsp; - Negative calculated log2Odd above lods cut off will assign the left haplotype to maternal allele.\
-               &emsp; &emsp; - Calculated abs |log2Odd| below lods cut off threshold will leave hapltoype unassigned.
-
-- **--culLH** _(maxPd)_ - Method for Cumulative likelhood estimates -> The likelhoods for haplotype segregation can
-                            either be **max-sum** vs. **max-product**.
-                            ***Default*** is "max-product". ***Options:*** 'maxPd' or 'maxSum'.
-- **--chr** - Restrict haplotype stitching to a specific chromosome.
-- **--hapStats** _(no)_ - Computes the descriptive statistics of final haplotype. **Options:** 'yes', 'no'
+For exploratory analysis of statistics generated from file: visit this [notebook](EDA%20on%20hapstats%20data%20generated%20from%20phase%20stitcher.ipynb).
 
 ## Output Files
 

@@ -1,0 +1,2 @@
+CHROM	totalPhasedBlocks	totalUnPhasedBlocks	totalVarsPhasedBlocks	totalVarsUnPhasedBlocks	phasedBlocksPI	unphasedBlocksPI	numVarsInPhasedBlock	numVarsInUnPhasedBlock	log2oddsInPhasedBlock	log2oddsInUnPhasedBlock	totalNumOfBlock	totalNumOfVars
+2	1	0	10	0	9	.	10	.	6.017	.	1	10
