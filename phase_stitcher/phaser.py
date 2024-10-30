@@ -16,7 +16,6 @@ from phase_stitcher.utils import current_mem_usage
 # from dowser.utils import launch_memory_usage_server
 # launch_memory_usage_server()
 
-
 def phase_stich(
     input_file, soimeta, outputdir, chr_list, nt, lods_cut_off, maxed_as, hapstats
 ):
